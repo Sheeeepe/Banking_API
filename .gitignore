@@ -1,0 +1,14 @@
+/vendor/
+.env
+/.env
+/.env.local
+/composer.phar
+/package-lock.json
+*.log
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+.env
