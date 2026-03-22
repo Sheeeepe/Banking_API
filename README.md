@@ -28,7 +28,7 @@ This implementation extends the base requirements with a Preact frontend and a f
 
 ## Project Structure
 
-```
+```shell
 Banking_API/
 ├── api/
 │   ├── public/
@@ -79,11 +79,11 @@ docker compose up --build
 
 **3. Access the services:**
 
-| Service    | URL                   |
-| ---------- | --------------------- |
-| Frontend   | http://localhost:5173 |
-| API        | http://localhost:8080 |
-| phpMyAdmin | http://localhost:8081 |
+| Service    | URL                     |
+| ---------- | ----------------------- |
+| Frontend   | <http://localhost:5173> |
+| API        | <http://localhost:8080> |
+| phpMyAdmin | <http://localhost:8081> |
 
 ## API Endpoints
 
