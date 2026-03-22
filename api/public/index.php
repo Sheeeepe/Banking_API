@@ -1,5 +1,11 @@
 <?php
 
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
+
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../src/database.php';
 

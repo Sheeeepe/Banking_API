@@ -1,0 +1,53 @@
+services:
+  my_api:
+    build:
+      context: ./build
+      dockerfile: Dockerfile.api
+    ports:
+      - 8080:8080
+    volumes:
+      - ./api:/api
+    depends_on:
+      - my_mariadb
+    environment:
+      - DB_HOST=my_mariadb
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+
+  my_frontend:
+    build:
+      context: ./build
+      dockerfile: Dockerfile.frontend
+    ports:
+      - 5173:5173
+    volumes:
+      - ./app:/app
+    depends_on:
+      - my_api
+
+  my_mariadb:
+    image: mariadb:latest
+    environment:
+      - MARIADB_ROOT_PASSWORD=${DB_PASSWORD}
+      - MARIADB_USER=${DB_USER}
+      - MARIADB_PASSWORD=${DB_PASSWORD}
+      - MARIADB_DATABASE=${DB_NAME}
+      - MARIADB_TCP_PORT=${DB_PORT}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./build/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  my_phpMyAdmin:
+    image: phpmyadmin
+    ports:
+      - 8081:80
+    environment:
+      - PMA_HOST=my_mariadb
+      - PMA_PORT=${DB_PORT}
+    depends_on:
+      - my_mariadb
+
+volumes:
+  mysql_data:

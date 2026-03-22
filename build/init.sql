@@ -1,8 +1,3 @@
--- Mini Banking API Database Schema
-
-CREATE DATABASE IF NOT EXISTS banking_db;
-USE banking_db;
-
 -- Accounts table
 CREATE TABLE IF NOT EXISTS accounts (
     id INT AUTO_INCREMENT PRIMARY KEY,

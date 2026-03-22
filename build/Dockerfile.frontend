@@ -1,0 +1,10 @@
+FROM node:21-alpine
+
+WORKDIR /app
+
+EXPOSE 5173
+
+COPY start-frontend.sh /start-frontend.sh
+RUN chmod +x /start-frontend.sh
+
+ENTRYPOINT ["/start-frontend.sh"]

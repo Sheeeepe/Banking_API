@@ -1,14 +1,18 @@
-/vendor/
+# Environment variables
 .env
-/.env
-/.env.local
-/composer.phar
-/package-lock.json
+.env.local
+.env.*.local
+
+# Logs
 *.log
+logs/
+
+# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+
+# OS
 .DS_Store
 Thumbs.db
-.env
