@@ -1,124 +1,127 @@
 # Mini Banking API
 
-REST API per la gestione di un conto bancario semplificato.
+A learning project — a REST API for basic banking operations built with PHP and Slim 4, with a Preact frontend and a fully dockerized setup.
 
-## Requisiti
+## Stack
 
-- PHP 8.3+
-- Composer
-- MariaDB/MySQL
-- Slim Framework 4
+| Layer     | Technology             |
+| --------- | ---------------------- |
+| API       | PHP 8.3, Slim 4        |
+| Frontend  | Preact, Vite           |
+| Database  | MariaDB                |
+| DB Admin  | phpMyAdmin             |
+| Container | Docker, Docker Compose |
 
-## Installazione
-
-1. Installa le dipendenze:
-
-```bash
-composer install
-```
-
-2. Avvia MariaDB (o MySQL) e crea il database:
-
-```bash
-docker run -d --name mariadb -e MYSQL_ROOT_PASSWORD=ciccio -e MYSQL_DATABASE=banking_db -p 3306:3306 mariadb:latest
-```
-
-Oppure esegui lo schema:
-
-```bash
-mysql -u root -p banking_db < database.sql
-```
-
-3. Avvia il server:
-
-```bash
-php -S 127.0.0.1:8080 -t public
-```
-
-4. Opzionale - collegamento phpmyadmin al db:
-
-```bash
-docker run -d --name phpmyadmin --network host -e PMA_HOST=127.0.0.1 -e MYSQL_ROOT_PASSWORD=ciccio -p 8080:80 phpmyadmin/phpmyadmin
+## Project Structure
 
 ```
+Banking_API/
+├── api/
+│   ├── public/
+│   │   └── index.php          # Entry point
+│   └── src/
+│       ├── controllers/
+│       │   └── AccountController.php
+│       ├── routes.php
+│       └── database.php
+├── app/
+│   └── src/
+│       ├── api.js             # API calls
+│       ├── app.jsx            # Root component
+│       └── components/        # UI components
+├── build/
+│   ├── Dockerfile.api
+│   ├── Dockerfile.frontend
+│   ├── init.sql               # DB schema + seed data
+│   ├── start-api.sh
+│   └── start-frontend.sh
+├── docker-compose.yaml
+├── .env
+└── .env.example
+```
 
-## Endpoint
+## Getting Started
 
-### Movimenti
-
-| Metodo | Endpoint                                      | Descrizione              |
-| ------ | --------------------------------------------- | ------------------------ |
-| GET    | `/accounts/{id}/transactions`                 | Lista movimenti          |
-| GET    | `/accounts/{id}/transactions/{transactionId}` | Dettaglio movimento      |
-| POST   | `/accounts/{id}/deposits`                     | Registra deposito        |
-| POST   | `/accounts/{id}/withdrawals`                  | Registra prelievo        |
-| PUT    | `/accounts/{id}/transactions/{transactionId}` | Modifica descrizione     |
-| DELETE | `/accounts/{id}/transactions/{transactionId}` | Elimina ultimo movimento |
-
-### Saldo
-
-| Metodo | Endpoint                 | Descrizione   |
-| ------ | ------------------------ | ------------- |
-| GET    | `/accounts/{id}/balance` | Saldo attuale |
-
-### Conversione
-
-| Metodo | Endpoint                                       | Descrizione              |
-| ------ | ---------------------------------------------- | ------------------------ |
-| GET    | `/accounts/{id}/balance/convert/fiat?to=USD`   | Converti in valuta fiat  |
-| GET    | `/accounts/{id}/balance/convert/crypto?to=BTC` | Converti in criptovaluta |
-
-## Esempi di chiamata
-
-### Creare un deposito
+**1. Clone the repo and create your `.env`:**
 
 ```bash
-curl -X POST http://127.0.0.1:8080/accounts/1/deposits \
+cp .env.example .env
+```
+
+Edit `.env` with your values:
+
+```env
+DB_PORT=3306
+DB_NAME=banking_db
+DB_USER=banking_user      # Do not use 'root'
+DB_PASSWORD=yourpassword
+```
+
+**2. Start all services:**
+
+```bash
+docker compose up --build
+```
+
+**3. Access the services:**
+
+| Service    | URL                   |
+| ---------- | --------------------- |
+| Frontend   | http://localhost:5173 |
+| API        | http://localhost:8080 |
+| phpMyAdmin | http://localhost:8081 |
+
+## API Endpoints
+
+All endpoints are relative to `http://localhost:8080`.
+
+### Accounts
+
+| Method   | Endpoint                                      | Description                    |
+| -------- | --------------------------------------------- | ------------------------------ |
+| `GET`    | `/accounts/{id}/balance`                      | Get current balance            |
+| `GET`    | `/accounts/{id}/transactions`                 | List all transactions          |
+| `GET`    | `/accounts/{id}/transactions/{transactionId}` | Get a single transaction       |
+| `POST`   | `/accounts/{id}/deposits`                     | Create a deposit               |
+| `POST`   | `/accounts/{id}/withdrawals`                  | Create a withdrawal            |
+| `PUT`    | `/accounts/{id}/transactions/{transactionId}` | Update transaction description |
+| `DELETE` | `/accounts/{id}/transactions/{transactionId}` | Delete last transaction        |
+
+### Currency Conversion
+
+| Method | Endpoint                                       | Description                      |
+| ------ | ---------------------------------------------- | -------------------------------- |
+| `GET`  | `/accounts/{id}/balance/convert/fiat?to=USD`   | Convert balance to fiat currency |
+| `GET`  | `/accounts/{id}/balance/convert/crypto?to=BTC` | Convert balance to crypto        |
+
+Fiat conversion uses [Frankfurter](https://frankfurter.dev). Crypto conversion uses [Binance](https://binance.com).
+
+### Example Requests
+
+```bash
+# Get balance
+curl http://localhost:8080/accounts/1/balance
+
+# Deposit
+curl -X POST http://localhost:8080/accounts/1/deposits \
   -H "Content-Type: application/json" \
-  -d '{"amount": 1000, "description": "Initial deposit"}'
-```
+  -d '{"amount": 100.00, "description": "Salary"}'
 
-### Creare un prelievo
-
-```bash
-curl -X POST http://127.0.0.1:8080/accounts/1/withdrawals \
+# Withdraw
+curl -X POST http://localhost:8080/accounts/1/withdrawals \
   -H "Content-Type: application/json" \
-  -d '{"amount": 200, "description": "ATM withdrawal"}'
+  -d '{"amount": 50.00, "description": "Groceries"}'
+
+# Convert to USD
+curl http://localhost:8080/accounts/1/balance/convert/fiat?to=USD
+
+# Convert to BTC
+curl http://localhost:8080/accounts/1/balance/convert/crypto?to=BTC
 ```
 
-### Visualizzare il saldo
+## Notes
 
-```bash
-curl http://127.0.0.1:8080/accounts/1/balance
-```
-
-### Convertire in USD
-
-```bash
-curl "http://127.0.0.1:8080/accounts/1/balance/convert/fiat?to=USD"
-```
-
-### Convertire in BTC
-
-```bash
-curl "http://127.0.0.1:8080/accounts/1/balance/convert/crypto?to=BTC"
-```
-
-### Modificare la descrizione di un movimento
-
-```bash
-curl -X PUT http://127.0.0.1:8080/accounts/1/transactions/1 \
-  -H "Content-Type: application/json" \
-  -d '{"description": "Updated description"}'
-```
-
-### Eliminare un movimento (solo l'ultimo)
-
-```bash
-curl -X DELETE http://127.0.0.1:8080/accounts/1/transactions/1
-```
-
-## Servizi esterni
-
-- **Frankfurter** (https://api.frankfurter.dev) - Conversione valute fiat
-- **Binance** (https://api.binance.com) - Conversione criptovalute
+- The database is seeded with one demo account (`id = 1`) on first startup
+- Data is persisted in a named Docker volume (`mysql_data`) and survives container restarts
+- To reset the database: `docker compose down -v && docker compose up`
+- `composer install` and `npm install` run automatically on first container startup via the entrypoint scripts
