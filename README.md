@@ -1,6 +1,20 @@
 # Mini Banking API
 
-A learning project — a REST API for basic banking operations built with PHP and Slim 4, with a Preact frontend and a fully dockerized setup.
+A school exercise based on [this assignment](https://gist.github.com/benve-meucci/c0f418feb6aebf4ebfbc886b7f2861b1) — a REST API for basic banking operations built with PHP and Slim 4, with a Preact frontend and a fully dockerized setup.
+
+## Assignment
+
+The exercise required building a simplified REST banking backend in groups of 2–3 students, covering:
+
+- deposit and withdrawal registration
+- transaction list and detail
+- current balance calculation
+- balance conversion to fiat currency via [Frankfurter](https://frankfurter.dev)
+- balance conversion to cryptocurrency via [Binance](https://binance.com)
+
+Required technologies: **Slim**, **MySQL/MariaDB**, JSON responses.
+
+This implementation extends the base requirements with a Preact frontend and a fully containerized Docker setup.
 
 ## Stack
 
