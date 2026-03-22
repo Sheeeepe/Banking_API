@@ -2,7 +2,7 @@
 
 use App\Controllers\AccountController;
 
-return function ($app, $controller) {
+return function ($app, $db_conn) {
     $app->get('/', function ($request, $response) {
         $response->getBody()->write(json_encode([
             'message' => 'Mini Banking API',
@@ -11,13 +11,15 @@ return function ($app, $controller) {
         return $response->withHeader('Content-Type', 'application/json');
     });
 
-    $app->get('/accounts/{id}/transactions', [$controller, 'getTransactions']);
-    $app->get('/accounts/{id}/transactions/{transactionId}', [$controller, 'getTransaction']);
-    $app->post('/accounts/{id}/deposits', [$controller, 'createDeposit']);
-    $app->post('/accounts/{id}/withdrawals', [$controller, 'createWithdrawal']);
-    $app->put('/accounts/{id}/transactions/{transactionId}', [$controller, 'updateTransaction']);
-    $app->delete('/accounts/{id}/transactions/{transactionId}', [$controller, 'deleteTransaction']);
-    $app->get('/accounts/{id}/balance', [$controller, 'getBalance']);
-    $app->get('/accounts/{id}/balance/convert/fiat', [$controller, 'convertFiat']);
-    $app->get('/accounts/{id}/balance/convert/crypto', [$controller, 'convertCrypto']);
+    $account = new AccountController($db_conn);
+
+    $app->get('/accounts/{id}/transactions', [$account, 'getTransactions']);
+    $app->get('/accounts/{id}/transactions/{transactionId}', [$account, 'getTransaction']);
+    $app->post('/accounts/{id}/deposits', [$account, 'createDeposit']);
+    $app->post('/accounts/{id}/withdrawals', [$account, 'createWithdrawal']);
+    $app->put('/accounts/{id}/transactions/{transactionId}', [$account, 'updateTransaction']);
+    $app->delete('/accounts/{id}/transactions/{transactionId}', [$account, 'deleteTransaction']);
+    $app->get('/accounts/{id}/balance', [$account, 'getBalance']);
+    $app->get('/accounts/{id}/balance/convert/fiat', [$account, 'convertFiat']);
+    $app->get('/accounts/{id}/balance/convert/crypto', [$account, 'convertCrypto']);
 };

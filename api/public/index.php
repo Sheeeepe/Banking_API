@@ -9,18 +9,17 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
 }
 
 require_once __DIR__ . "/../vendor/autoload.php";
-require_once __DIR__ . "/../src/database.php";
 
 use Slim\Factory\AppFactory;
-use App\Controllers\AccountController;
 
 $app = AppFactory::create();
 
 $app->addBodyParsingMiddleware();
 
-$controller = new AccountController($mysqli);
+use App\Database;
+$db_conn = Database::getInstance()->getConnection();
 
 $routes = require __DIR__ . "/../src/routes.php";
-$routes($app, $controller);
+$routes($app, $db_conn);
 
 $app->run();
