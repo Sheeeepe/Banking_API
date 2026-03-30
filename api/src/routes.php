@@ -22,4 +22,5 @@ return function ($app, $db_conn) {
     $app->get('/accounts/{id}/balance', [$account, 'getBalance']);
     $app->get('/accounts/{id}/balance/convert/fiat', [$account, 'convertFiat']);
     $app->get('/accounts/{id}/balance/convert/crypto', [$account, 'convertCrypto']);
+    $app->post('/accounts', [$account, 'createAccount']);
 };

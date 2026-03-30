@@ -405,4 +405,35 @@ class AccountController
         $row = $result->fetch_assoc();
         return (float)($row['balance'] ?? 0);
     }
+
+    public function createAccount($request, $response, $args)
+    {
+        $data = json_decode((string)$request->getBody(), true);
+
+        if(!isset($data["owner_name"]) || !isset($data["currency"])){
+            $response->getBody()->write(json_encode(['error' => 'Owner name and currency must be set']));
+            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+        }
+
+        $owner_name = $data['owner_name'];
+        $currency = $data['currency'];
+
+        $stmt = $this->mysqli->prepare("    INSERT INTO accounts (owner_name,currency) VALUES (?,?)");
+
+        $stmt->bind_param("ss",$owner_name,$currency);
+        $stmt->execute();
+        $stmt->get_result();
+
+        $accountId = $this->mysqli->insert_id;
+
+        
+        $response->getBody()->write(json_encode([
+            'message' => 'Account successfully',
+            'accountId' => $accountId,
+            'owner_name' => $owner_name,
+            'currency' => $currency
+        ]));
+        return $response->withHeader('Content-Type', 'application/json');
+
+    }
 }
