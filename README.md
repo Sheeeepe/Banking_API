@@ -1,52 +1,57 @@
 # Mini Banking API
 
-A school exercise based on [this assignment](https://gist.github.com/benve-meucci/c0f418feb6aebf4ebfbc886b7f2861b1) — a REST API for basic banking operations built with PHP and Slim 4, with a Preact frontend and a fully dockerized setup.
+REST API per operazioni bancarie di base costruita con PHP e Slim 4, con frontend Vue 3 e setup completamente containerizzato.
 
-## Assignment
+Basata su [questa assegnazione](https://gist.github.com/benve-meucci/c0f418feb6aebf4ebfbc886b7f2861b1).
 
-The exercise required building a simplified REST banking backend in groups of 2–3 students, covering:
+## Stack Tecnologico
 
-- deposit and withdrawal registration
-- transaction list and detail
-- current balance calculation
-- balance conversion to fiat currency via [Frankfurter](https://frankfurter.dev)
-- balance conversion to cryptocurrency via [Binance](https://binance.com)
+| Livello    | Tecnologia              |
+| ---------- | ----------------------- |
+| API        | PHP 8.3, Slim 4         |
+| Frontend   | Vue 3, Vite, Vue Router |
+| Database   | MariaDB                 |
+| DB Admin   | phpMyAdmin              |
+| Container  | Docker, Docker Compose   |
 
-Required technologies: **Slim**, **MySQL/MariaDB**, JSON responses.
+## Struttura del Progetto
 
-This implementation extends the base requirements with a Preact frontend and a fully containerized Docker setup.
-
-## Stack
-
-| Layer     | Technology             |
-| --------- | ---------------------- |
-| API       | PHP 8.3, Slim 4        |
-| Frontend  | Preact, Vite           |
-| Database  | MariaDB                |
-| DB Admin  | phpMyAdmin             |
-| Container | Docker, Docker Compose |
-
-## Project Structure
-
-```shell
+```
 Banking_API/
 ├── api/
 │   ├── public/
 │   │   └── index.php          # Entry point
 │   └── src/
-│       ├── controllers/
+│       ├── Database.php       # Singleton per connessione DB
+│       ├── Controllers/
 │       │   └── AccountController.php
-│       ├── routes.php
-│       └── database.php
+│       └── routes.php
 ├── app/
+│   ├── index.html
+│   ├── vite.config.js
 │   └── src/
-│       ├── api.js             # API calls
-│       ├── app.jsx            # Root component
-│       └── components/        # UI components
+│       ├── main.js            # Entry point frontend
+│       ├── App.vue            # Componente radice
+│       ├── api.js             # Chiamate API
+│       ├── index.css
+│       ├── router/
+│       │   └── index.js       # Configurazione Vue Router
+│       ├── pages/
+│       │   ├── Home.vue
+│       │   └── TransactionDetailPage.vue
+│       └── components/
+│           ├── Balance.vue
+│           ├── Header.vue
+│           ├── TransactionForm.vue
+│           ├── TransactionList.vue
+│           ├── TransactionDetail.vue
+│           ├── FiatConverter.vue
+│           ├── CryptoConverter.vue
+│           └── Toast.vue
 ├── build/
 │   ├── Dockerfile.api
 │   ├── Dockerfile.frontend
-│   ├── init.sql               # DB schema + seed data
+│   ├── init.sql               # Schema e dati seed
 │   ├── start-api.sh
 │   └── start-frontend.sh
 ├── docker-compose.yaml
@@ -54,88 +59,202 @@ Banking_API/
 └── .env.example
 ```
 
-## Getting Started
+## Scelte Progettuali
 
-**1. Clone the repo and create your `.env`:**
+### Modello Dati
+
+**Tabella `accounts`:**
+- `id`, `owner_name`, `currency`, `created_at`
+- Un account per semplicità (come consigliato nell'assegnazione)
+
+**Tabella `transactions`:**
+- `id`, `account_id`, `type` (deposit/withdrawal), `amount`, `description`
+- `balance_after`: campo opzionale che memorizza il saldo dopo ogni operazione
+- `created_at`
+
+### Regole di Business
+
+**Deposito:**
+- L'importo deve essere maggiore di zero (validato con 400)
+
+**Prelievo:**
+- L'importo deve essere maggiore di zero
+- Non si può prelevare più del saldo disponibile (validato con 422)
+
+**Saldo:**
+- Non è memorizzato come campo, viene calcolato dinamicamente:
+  ```
+  saldo = SUM(depositi) - SUM(prelievi)
+  ```
+
+**Eliminazione movimenti:**
+- Si può eliminare solo l'ultimo movimento (l'API verifica che l'ID corrisponda al movimento più recente)
+- Questa regola mantiene la coerenza del saldo
+
+### Endpoint
+
+**Struttura REST:**
+- `POST /accounts/{id}/deposits` - registra un deposito
+- `POST /accounts/{id}/withdrawals` - registra un prelievo
+- `GET /accounts/{id}/balance` - calcola il saldo attuale
+- `GET /accounts/{id}/transactions` - lista movimenti
+- `GET /accounts/{id}/transactions/{id}` - dettaglio movimento
+- `PUT /accounts/{id}/transactions/{id}` - modifica solo la descrizione
+- `DELETE /accounts/{id}/transactions/{id}` - elimina solo l'ultimo movimento
+
+### Conversione Valute
+
+**Fiat (Frankfurter):**
+- Usa l'API `https://api.frankfurter.dev/v1/latest`
+- Moltiplica il saldo per il tasso di cambio
+- Arrotonda a 2 decimali
+
+**Crypto (Binance):**
+- Costruisce il simbolo di mercato come `{CRYPTO}{VALUTA}` (es. BTCEUR)
+- Verifica l'esistenza della coppia tramite `exchangeInfo`
+- Ottiene il prezzo tramite `ticker/price`
+- Divide il saldo per il prezzo (quantità di crypto ottenibile)
+- Arrotonda a 8 decimali
+
+### Gestione Errori
+
+| Codice | Casi                                      |
+| ------ | ----------------------------------------- |
+| 400    | Importo non valido, valuta mancante/non supportata |
+| 404    | Conto o movimento non trovato             |
+| 422    | Prelievo superiore al saldo disponibile   |
+| 502    | Errore nelle chiamate a API esterne       |
+
+### JSON Responses
+
+Le risposte seguono una struttura coerente con i campi suggeriti dall'assegnazione:
+- Campi minimi per operazioni semplici
+- Struttura estesa per conversioni con `provider`, `rate`, `converted_balance`
+
+### Frontend (Vue 3)
+
+- Single Page Application con Vue Router
+- Gestione stato locale nei componenti
+- Comunicazione con API tramite modulo `api.js`
+- Componenti per: saldo, lista transazioni, form operazioni, convertitori fiat/crypto
+- Sistema di notifiche toast per feedback utente
+
+## Avvio Rapido
+
+**1. Clona il repo e crea `.env`:**
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your values:
+Modifica `.env`:
 
 ```env
 DB_PORT=3306
 DB_NAME=banking_db
-DB_USER=banking_user      # Do not use 'root'
-DB_PASSWORD=yourpassword
+DB_USER=banking_user
+DB_PASSWORD=tuapassword
 ```
 
-**2. Start all services:**
+**2. Avvia tutti i servizi:**
 
 ```bash
 docker compose up --build
 ```
 
-**3. Access the services:**
+**3. Accedi ai servizi:**
 
-| Service    | URL                     |
-| ---------- | ----------------------- |
-| Frontend   | <http://localhost:5173> |
-| API        | <http://localhost:8080> |
-| phpMyAdmin | <http://localhost:8081> |
+| Servizio    | URL                      |
+| ----------- | ------------------------ |
+| Frontend    | http://localhost:5173    |
+| API         | http://localhost:8080    |
+| phpMyAdmin  | http://localhost:8081    |
 
-## API Endpoints
+## Endpoint API
 
-All endpoints are relative to `http://localhost:8080`.
+Tutti gli endpoint sono relativi a `http://localhost:8080`.
 
-### Accounts
+### Conto
 
-| Method   | Endpoint                                      | Description                    |
-| -------- | --------------------------------------------- | ------------------------------ |
-| `GET`    | `/accounts/{id}/balance`                      | Get current balance            |
-| `GET`    | `/accounts/{id}/transactions`                 | List all transactions          |
-| `GET`    | `/accounts/{id}/transactions/{transactionId}` | Get a single transaction       |
-| `POST`   | `/accounts/{id}/deposits`                     | Create a deposit               |
-| `POST`   | `/accounts/{id}/withdrawals`                  | Create a withdrawal            |
-| `PUT`    | `/accounts/{id}/transactions/{transactionId}` | Update transaction description |
-| `DELETE` | `/accounts/{id}/transactions/{transactionId}` | Delete last transaction        |
+| Metodo   | Endpoint                     | Descrizione                |
+| -------- | ---------------------------- | -------------------------- |
+| `GET`    | `/accounts/{id}/balance`     | Ottieni saldo attuale     |
+| `POST`   | `/accounts`                  | Crea un nuovo conto        |
 
-### Currency Conversion
+### Transazioni
 
-| Method | Endpoint                                       | Description                      |
-| ------ | ---------------------------------------------- | -------------------------------- |
-| `GET`  | `/accounts/{id}/balance/convert/fiat?to=USD`   | Convert balance to fiat currency |
-| `GET`  | `/accounts/{id}/balance/convert/crypto?to=BTC` | Convert balance to crypto        |
+| Metodo   | Endpoint                                         | Descrizione                     |
+| -------- | ------------------------------------------------ | ------------------------------- |
+| `GET`    | `/accounts/{id}/transactions`                    | Lista tutti i movimenti        |
+| `GET`    | `/accounts/{id}/transactions/{transactionId}`   | Dettaglio di un movimento      |
+| `POST`   | `/accounts/{id}/deposits`                        | Registra un deposito           |
+| `POST`   | `/accounts/{id}/withdrawals`                     | Registra un prelievo           |
+| `PUT`    | `/accounts/{id}/transactions/{transactionId}`    | Modifica descrizione            |
+| `DELETE` | `/accounts/{id}/transactions/{transactionId}`   | Elimina ultimo movimento       |
 
-Fiat conversion uses [Frankfurter](https://frankfurter.dev). Crypto conversion uses [Binance](https://binance.com).
+### Conversione
 
-### Example Requests
+| Metodo | Endpoint                                        | Descrizione                     |
+| ------ | ----------------------------------------------- | ------------------------------- |
+| `GET`  | `/accounts/{id}/balance/convert/fiat?to=USD`   | Converti in valuta fiat         |
+| `GET`  | `/accounts/{id}/balance/convert/crypto?to=BTC` | Converti in criptovaluta        |
+
+### Esempi di Chiamate
 
 ```bash
-# Get balance
+# Crea account
+curl -X POST http://localhost:8080/accounts \
+  -H "Content-Type: application/json" \
+  -d '{"owner_name": "Mario Rossi", "currency": "EUR"}'
+
+# Ottieni saldo
 curl http://localhost:8080/accounts/1/balance
 
-# Deposit
+# Deposito
 curl -X POST http://localhost:8080/accounts/1/deposits \
   -H "Content-Type: application/json" \
-  -d '{"amount": 100.00, "description": "Salary"}'
+  -d '{"amount": 1000.00, "description": "Stipendio"}'
 
-# Withdraw
+# Prelievo
 curl -X POST http://localhost:8080/accounts/1/withdrawals \
   -H "Content-Type: application/json" \
-  -d '{"amount": 50.00, "description": "Groceries"}'
+  -d '{"amount": 50.00, "description": "Spesa"}'
 
-# Convert to USD
-curl http://localhost:8080/accounts/1/balance/convert/fiat?to=USD
+# Lista movimenti
+curl http://localhost:8080/accounts/1/transactions
 
-# Convert to BTC
-curl http://localhost:8080/accounts/1/balance/convert/crypto?to=BTC
+# Dettaglio movimento
+curl http://localhost:8080/accounts/1/transactions/1
+
+# Modifica descrizione
+curl -X PUT http://localhost:8080/accounts/1/transactions/1 \
+  -H "Content-Type: application/json" \
+  -d '{"description": "Uscita cena"}'
+
+# Elimina ultimo movimento
+curl -X DELETE http://localhost:8080/accounts/1/transactions/2
+
+# Converti in USD
+curl "http://localhost:8080/accounts/1/balance/convert/fiat?to=USD"
+
+# Converti in BTC
+curl "http://localhost:8080/accounts/1/balance/convert/crypto?to=BTC"
 ```
 
-## Notes
+## Criteri di Valutazione Rispettati
 
-- The database is seeded with one demo account (`id = 1`) on first startup
-- Data is persisted in a named Docker volume (`mysql_data`) and survives container restarts
-- To reset the database: `docker compose down -v && docker compose up`
-- `composer install` and `npm install` run automatically on first container startup via the entrypoint scripts
+- Correttezza degli endpoint REST
+- Qualità del modello dati
+- Correttezza della logica di business
+- Uso corretto del database (prepared statements, foreign keys)
+- Integrazione con Frankfurter
+- Integrazione con Binance
+- Gestione degli errori con codici HTTP appropriati
+- Chiarezza del JSON nelle risposte
+
+## Note
+
+- Il database viene inizializzato con un account demo (`id = 1`) al primo avvio
+- I dati sono persistiti in un volume Docker (`mysql_data`)
+- Per resettare: `docker compose down -v && docker compose up`
+- `composer install` e `npm install` vengono eseguiti automaticamente al primo avvio
