@@ -9,7 +9,7 @@ class Database
 
     private function __construct()
     {
-        $host     = 'my_mariadb';
+        $host     = getenv('DB_HOST') ?: 'my_mariadb';
         $port     = (int)(getenv('DB_PORT') ?: 3306);
         $dbname   = getenv('DB_NAME')     ?: 'banking_db';
         $username = getenv('DB_USER')     ?: 'banking_user';

@@ -8,7 +8,7 @@ if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     exit(0);
 }
 
-require_once __DIR__ . "/../vendor/autoload.php";
+require_once __DIR__ . "/vendor/autoload.php";
 
 use Slim\Factory\AppFactory;
 
@@ -19,7 +19,7 @@ $app->addBodyParsingMiddleware();
 use App\Database;
 $db_conn = Database::getInstance()->getConnection();
 
-$routes = require __DIR__ . "/../src/routes.php";
+$routes = require __DIR__ . "/src/routes.php";
 $routes($app, $db_conn);
 
 $app->run();

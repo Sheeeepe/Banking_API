@@ -1,0 +1,9 @@
+.git
+.gitignore
+.gitattributes
+vendor
+composer.lock
+.dockerignore
+README.md
+docker-compose.yaml
+.opencode
