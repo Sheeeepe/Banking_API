@@ -2,7 +2,7 @@ services:
   my_api:
     build:
       context: ./build
-      dockerfile: Dockerfile.api
+      dockerfile: Dockerfile
     ports:
       - 8080:8080
     volumes:
@@ -15,17 +15,6 @@ services:
       - DB_NAME=${DB_NAME}
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
-
-  my_frontend:
-    build:
-      context: ./build
-      dockerfile: Dockerfile.frontend
-    ports:
-      - 5173:5173
-    volumes:
-      - ./app:/app
-    depends_on:
-      - my_api
 
   my_mariadb:
     image: mariadb:latest
