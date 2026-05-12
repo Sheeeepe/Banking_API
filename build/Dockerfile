@@ -6,8 +6,8 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-COPY start-api.sh /start-api.sh
-RUN chmod +x /start-api.sh
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
 
-ENTRYPOINT ["/start-api.sh"]
+ENTRYPOINT ["/start.sh"]
 EXPOSE 8080
