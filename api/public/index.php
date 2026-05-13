@@ -17,9 +17,9 @@ $app = AppFactory::create();
 $app->addBodyParsingMiddleware();
 
 use App\Database;
-$db_conn = Database::getInstance()->getConnection();
+Database::setup();
 
 $routes = require __DIR__ . "/../src/routes.php";
-$routes($app, $db_conn);
+$routes($app);
 
 $app->run();

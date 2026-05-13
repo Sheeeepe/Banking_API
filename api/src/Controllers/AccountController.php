@@ -2,438 +2,273 @@
 
 namespace App\Controllers;
 
+use App\Models\Account;
+use App\Models\Transaction;
+use App\Services\TransactionService;
+use App\Services\ExchangeService;
+
 class AccountController
 {
-    private $mysqli;
+    private TransactionService $transactionService;
+    private ExchangeService $exchangeService;
 
-    public function __construct($mysqli)
+    public function __construct()
     {
-        $this->mysqli = $mysqli;
+        $this->transactionService = new TransactionService();
+        $this->exchangeService = new ExchangeService();
+    }
+
+    private function jsonResponse($response, $data, int $status = 200)
+    {
+        $response->getBody()->write(json_encode($data));
+        return $response->withHeader('Content-Type', 'application/json')->withStatus($status);
     }
 
     public function getTransactions($request, $response, $args)
     {
-        $accountId = (int)$args['id'];
-        
-        $stmt = $this->mysqli->prepare('SELECT id, currency FROM accounts WHERE id = ?');
-        $stmt->bind_param('i', $accountId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $account = $result->fetch_assoc();
-        
+        $accountId = (int) $args['id'];
+
+        $account = Account::find($accountId);
         if (!$account) {
-            $response->getBody()->write(json_encode(['error' => 'Account not found']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+            return $this->jsonResponse($response, ['error' => 'Account not found'], 404);
         }
-        
-        $stmt = $this->mysqli->prepare('SELECT * FROM transactions WHERE account_id = ? ORDER BY created_at DESC');
-        $stmt->bind_param('i', $accountId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        $transactions = [];
-        while ($row = $result->fetch_assoc()) {
-            $transactions[] = $row;
-        }
-        
-        $response->getBody()->write(json_encode([
-            'account_id' => $accountId,
-            'currency' => $account['currency'],
+
+        $transactions = $account->transactions()->orderBy('created_at', 'desc')->get();
+
+        return $this->jsonResponse($response, [
+            'account_id' => $account->id,
+            'currency' => $account->currency,
             'transactions' => $transactions
-        ]));
-        return $response->withHeader('Content-Type', 'application/json');
+        ]);
     }
 
     public function getTransaction($request, $response, $args)
     {
-        $accountId = (int)$args['id'];
-        $transactionId = (int)$args['transactionId'];
-        
-        $stmt = $this->mysqli->prepare('SELECT * FROM transactions WHERE id = ? AND account_id = ?');
-        $stmt->bind_param('ii', $transactionId, $accountId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $transaction = $result->fetch_assoc();
-        
+        $accountId = (int) $args['id'];
+        $transactionId = (int) $args['transactionId'];
+
+        $transaction = Transaction::where('id', $transactionId)
+            ->where('account_id', $accountId)
+            ->first();
+
         if (!$transaction) {
-            $response->getBody()->write(json_encode(['error' => 'Transaction not found']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+            return $this->jsonResponse($response, ['error' => 'Transaction not found'], 404);
         }
-        
-        $response->getBody()->write(json_encode($transaction));
-        return $response->withHeader('Content-Type', 'application/json');
+
+        return $this->jsonResponse($response, $transaction);
     }
 
     public function createDeposit($request, $response, $args)
     {
-        $accountId = (int)$args['id'];
+        $accountId = (int) $args['id'];
         $data = $request->getParsedBody();
-        
-        if (!isset($data['amount']) || !is_numeric($data['amount']) || $data['amount'] <= 0) {
-            $response->getBody()->write(json_encode(['error' => 'Amount must be greater than zero']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
-        }
-        
-        $amount = (float)$data['amount'];
+
+        $amount = isset($data['amount']) ? (float) $data['amount'] : 0;
         $description = $data['description'] ?? '';
-        
-        $stmt = $this->mysqli->prepare('SELECT id, currency FROM accounts WHERE id = ?');
-        $stmt->bind_param('i', $accountId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $account = $result->fetch_assoc();
-        
+
+        $account = Account::find($accountId);
         if (!$account) {
-            $response->getBody()->write(json_encode(['error' => 'Account not found']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+            return $this->jsonResponse($response, ['error' => 'Account not found'], 404);
         }
-        
-        $currentBalance = $this->calculateBalance($accountId);
-        $newBalance = $currentBalance + $amount;
-        
-        $stmt = $this->mysqli->prepare('INSERT INTO transactions (account_id, type, amount, description, balance_after) VALUES (?, ?, ?, ?, ?)');
-        $type = 'deposit';
-        $stmt->bind_param('isdsd', $accountId, $type, $amount, $description, $newBalance);
-        $stmt->execute();
-        
-        $transactionId = $this->mysqli->insert_id;
-        
-        $response->getBody()->write(json_encode([
+
+        try {
+            $transaction = $this->transactionService->createDeposit($account, $amount, $description);
+        } catch (\InvalidArgumentException $e) {
+            return $this->jsonResponse($response, ['error' => $e->getMessage()], 400);
+        }
+
+        return $this->jsonResponse($response, [
             'message' => 'Deposit successful',
-            'transaction_id' => $transactionId,
-            'account_id' => $accountId,
+            'transaction_id' => $transaction->id,
+            'account_id' => $account->id,
             'type' => 'deposit',
-            'amount' => $amount,
-            'description' => $description,
-            'balance_after' => $newBalance
-        ]));
-        return $response->withHeader('Content-Type', 'application/json')->withStatus(201);
+            'amount' => $transaction->amount,
+            'description' => $transaction->description,
+            'balance_after' => $transaction->balance_after
+        ], 201);
     }
 
     public function createWithdrawal($request, $response, $args)
     {
-        $accountId = (int)$args['id'];
+        $accountId = (int) $args['id'];
         $data = $request->getParsedBody();
-        
-        if (!isset($data['amount']) || !is_numeric($data['amount']) || $data['amount'] <= 0) {
-            $response->getBody()->write(json_encode(['error' => 'Amount must be greater than zero']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
-        }
-        
-        $amount = (float)$data['amount'];
+
+        $amount = isset($data['amount']) ? (float) $data['amount'] : 0;
         $description = $data['description'] ?? '';
-        
-        $stmt = $this->mysqli->prepare('SELECT id, currency FROM accounts WHERE id = ?');
-        $stmt->bind_param('i', $accountId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $account = $result->fetch_assoc();
-        
+
+        $account = Account::find($accountId);
         if (!$account) {
-            $response->getBody()->write(json_encode(['error' => 'Account not found']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+            return $this->jsonResponse($response, ['error' => 'Account not found'], 404);
         }
-        
-        $currentBalance = $this->calculateBalance($accountId);
-        
-        if ($amount > $currentBalance) {
-            $response->getBody()->write(json_encode(['error' => 'Insufficient funds']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(422);
+
+        try {
+            $transaction = $this->transactionService->createWithdrawal($account, $amount, $description);
+        } catch (\InvalidArgumentException $e) {
+            $status = $e->getMessage() === 'Insufficient funds' ? 422 : 400;
+            return $this->jsonResponse($response, ['error' => $e->getMessage()], $status);
         }
-        
-        $newBalance = $currentBalance - $amount;
-        
-        $stmt = $this->mysqli->prepare('INSERT INTO transactions (account_id, type, amount, description, balance_after) VALUES (?, ?, ?, ?, ?)');
-        $type = 'withdrawal';
-        $stmt->bind_param('isdsd', $accountId, $type, $amount, $description, $newBalance);
-        $stmt->execute();
-        
-        $transactionId = $this->mysqli->insert_id;
-        
-        $response->getBody()->write(json_encode([
+
+        return $this->jsonResponse($response, [
             'message' => 'Withdrawal successful',
-            'transaction_id' => $transactionId,
-            'account_id' => $accountId,
+            'transaction_id' => $transaction->id,
+            'account_id' => $account->id,
             'type' => 'withdrawal',
-            'amount' => $amount,
-            'description' => $description,
-            'balance_after' => $newBalance
-        ]));
-        return $response->withHeader('Content-Type', 'application/json')->withStatus(201);
+            'amount' => $transaction->amount,
+            'description' => $transaction->description,
+            'balance_after' => $transaction->balance_after
+        ], 201);
     }
 
     public function updateTransaction($request, $response, $args)
     {
-        $accountId = (int)$args['id'];
-        $transactionId = (int)$args['transactionId'];
+        $accountId = (int) $args['id'];
+        $transactionId = (int) $args['transactionId'];
         $data = $request->getParsedBody();
-        
+
         if (!isset($data['description'])) {
-            $response->getBody()->write(json_encode(['error' => 'Description is required']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+            return $this->jsonResponse($response, ['error' => 'Description is required'], 400);
         }
-        
-        $stmt = $this->mysqli->prepare('SELECT id FROM transactions WHERE id = ? AND account_id = ?');
-        $stmt->bind_param('ii', $transactionId, $accountId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        if ($result->num_rows === 0) {
-            $response->getBody()->write(json_encode(['error' => 'Transaction not found']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+
+        $transaction = Transaction::where('id', $transactionId)
+            ->where('account_id', $accountId)
+            ->first();
+
+        if (!$transaction) {
+            return $this->jsonResponse($response, ['error' => 'Transaction not found'], 404);
         }
-        
-        $description = $data['description'];
-        $stmt = $this->mysqli->prepare('UPDATE transactions SET description = ? WHERE id = ? AND account_id = ?');
-        $stmt->bind_param('sii', $description, $transactionId, $accountId);
-        $stmt->execute();
-        
-        $response->getBody()->write(json_encode([
+
+        $transaction->update(['description' => $data['description']]);
+
+        return $this->jsonResponse($response, [
             'message' => 'Transaction updated successfully',
-            'transaction_id' => $transactionId,
-            'description' => $description
-        ]));
-        return $response->withHeader('Content-Type', 'application/json');
+            'transaction_id' => $transaction->id,
+            'description' => $transaction->description
+        ]);
     }
 
     public function deleteTransaction($request, $response, $args)
     {
-        $accountId = (int)$args['id'];
-        $transactionId = (int)$args['transactionId'];
-        
-        $stmt = $this->mysqli->prepare('SELECT id, balance_after FROM transactions WHERE id = ? AND account_id = ? ORDER BY created_at DESC LIMIT 1');
-        $stmt->bind_param('ii', $transactionId, $accountId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $transaction = $result->fetch_assoc();
-        
+        $accountId = (int) $args['id'];
+        $transactionId = (int) $args['transactionId'];
+
+        $transaction = Transaction::where('id', $transactionId)
+            ->where('account_id', $accountId)
+            ->first();
+
         if (!$transaction) {
-            $response->getBody()->write(json_encode(['error' => 'Transaction not found']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+            return $this->jsonResponse($response, ['error' => 'Transaction not found'], 404);
         }
-        
-        $stmt = $this->mysqli->prepare('SELECT id FROM transactions WHERE account_id = ? ORDER BY created_at DESC LIMIT 1');
-        $stmt->bind_param('i', $accountId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $lastTransaction = $result->fetch_assoc();
-        
-        if ($lastTransaction['id'] != $transactionId) {
-            $response->getBody()->write(json_encode(['error' => 'Can only delete the last transaction']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(422);
+
+        // Can only delete the last transaction
+        $lastTransaction = Transaction::where('account_id', $accountId)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if (!$lastTransaction || $lastTransaction->id != $transactionId) {
+            return $this->jsonResponse($response, ['error' => 'Can only delete the last transaction'], 422);
         }
-        
-        $stmt = $this->mysqli->prepare('DELETE FROM transactions WHERE id = ? AND account_id = ?');
-        $stmt->bind_param('ii', $transactionId, $accountId);
-        $stmt->execute();
-        
-        $response->getBody()->write(json_encode([
+
+        $transaction->delete();
+
+        return $this->jsonResponse($response, [
             'message' => 'Transaction deleted successfully',
             'transaction_id' => $transactionId
-        ]));
-        return $response->withHeader('Content-Type', 'application/json');
+        ]);
     }
 
     public function getBalance($request, $response, $args)
     {
-        $accountId = (int)$args['id'];
-        
-        $stmt = $this->mysqli->prepare('SELECT id, owner_name, currency FROM accounts WHERE id = ?');
-        $stmt->bind_param('i', $accountId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $account = $result->fetch_assoc();
-        
+        $accountId = (int) $args['id'];
+
+        $account = Account::find($accountId);
         if (!$account) {
-            $response->getBody()->write(json_encode(['error' => 'Account not found']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+            return $this->jsonResponse($response, ['error' => 'Account not found'], 404);
         }
-        
-        $balance = $this->calculateBalance($accountId);
-        
-        $response->getBody()->write(json_encode([
-            'account_id' => $accountId,
-            'owner_name' => $account['owner_name'],
-            'currency' => $account['currency'],
+
+        $balance = $this->transactionService->calculateBalance($account);
+
+        return $this->jsonResponse($response, [
+            'account_id' => $account->id,
+            'owner_name' => $account->owner_name,
+            'currency' => $account->currency,
             'balance' => $balance
-        ]));
-        return $response->withHeader('Content-Type', 'application/json');
+        ]);
     }
 
     public function convertFiat($request, $response, $args)
     {
-        $accountId = (int)$args['id'];
+        $accountId = (int) $args['id'];
         $params = $request->getQueryParams();
         $to = strtoupper($params['to'] ?? '');
-        
+
         if (!$to) {
-            $response->getBody()->write(json_encode(['error' => 'Missing target currency']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+            return $this->jsonResponse($response, ['error' => 'Missing target currency'], 400);
         }
-        
-        $stmt = $this->mysqli->prepare('SELECT id, currency FROM accounts WHERE id = ?');
-        $stmt->bind_param('i', $accountId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $account = $result->fetch_assoc();
-        
+
+        $account = Account::find($accountId);
         if (!$account) {
-            $response->getBody()->write(json_encode(['error' => 'Account not found']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
+            return $this->jsonResponse($response, ['error' => 'Account not found'], 404);
         }
-        
-        $from = strtoupper($account['currency']);
-        $balance = $this->calculateBalance($accountId);
-        
-        $url = "https://api.frankfurter.dev/v1/latest?base={$from}&symbols={$to}";
-        $json = @file_get_contents($url);
-        
-        if ($json === false) {
-            $response->getBody()->write(json_encode(['error' => 'External exchange API unavailable']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(502);
+
+        $balance = $this->transactionService->calculateBalance($account);
+
+        try {
+            $result = $this->exchangeService->convertFiat($account, $balance, $to);
+            $result['account_id'] = $account->id;
+            return $this->jsonResponse($response, $result);
+        } catch (\RuntimeException $e) {
+            return $this->jsonResponse($response, ['error' => $e->getMessage()], 502);
+        } catch (\InvalidArgumentException $e) {
+            return $this->jsonResponse($response, ['error' => $e->getMessage()], 400);
         }
-        
-        $data = json_decode($json, true);
-        
-        if (!isset($data['rates'][$to])) {
-            $response->getBody()->write(json_encode(['error' => 'Target currency not supported']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
-        }
-        
-        $rate = (float)$data['rates'][$to];
-        $converted = round($balance * $rate, 2);
-        
-        $response->getBody()->write(json_encode([
-            'account_id' => $accountId,
-            'provider' => 'Frankfurter',
-            'conversion_type' => 'fiat',
-            'from_currency' => $from,
-            'to_currency' => $to,
-            'original_balance' => $balance,
-            'converted_balance' => $converted,
-            'rate' => $rate,
-            'date' => $data['date'] ?? null
-        ]));
-        return $response->withHeader('Content-Type', 'application/json');
     }
 
     public function convertCrypto($request, $response, $args)
     {
-        $accountId = (int)$args['id'];
+        $accountId = (int) $args['id'];
         $params = $request->getQueryParams();
         $to = strtoupper($params['to'] ?? '');
-        
-        if (!$to) {
-            $response->getBody()->write(json_encode(['error' => 'Missing target crypto']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
-        }
-        
-        $stmt = $this->mysqli->prepare('SELECT id, currency FROM accounts WHERE id = ?');
-        $stmt->bind_param('i', $accountId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $account = $result->fetch_assoc();
-        
-        if (!$account) {
-            $response->getBody()->write(json_encode(['error' => 'Account not found']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(404);
-        }
-        
-        $from = strtoupper($account['currency']);
-        $marketSymbol = $to . $from;
-        
-        $exchangeInfoUrl = "https://api.binance.com/api/v3/exchangeInfo";
-        $exchangeInfoJson = @file_get_contents($exchangeInfoUrl);
-        
-        if ($exchangeInfoJson === false) {
-            $response->getBody()->write(json_encode(['error' => 'External exchange API unavailable']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(502);
-        }
-        
-        $exchangeInfo = json_decode($exchangeInfoJson, true);
-        $symbols = array_column($exchangeInfo['symbols'] ?? [], 'symbol');
-        
-        if (!in_array($marketSymbol, $symbols)) {
-            $response->getBody()->write(json_encode(['error' => 'Crypto symbol not supported with this currency']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
-        }
-        
-        $balance = $this->calculateBalance($accountId);
-        
-        $priceUrl = "https://api.binance.com/api/v3/ticker/price?symbol=" . $marketSymbol;
-        $priceJson = @file_get_contents($priceUrl);
-        
-        if ($priceJson === false) {
-            $response->getBody()->write(json_encode(['error' => 'Unable to get crypto price']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(502);
-        }
-        
-        $priceData = json_decode($priceJson, true);
-        
-        if (!isset($priceData['price'])) {
-            $response->getBody()->write(json_encode(['error' => 'Price data not available']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(502);
-        }
-        
-        $price = (float)$priceData['price'];
-        $convertedAmount = $balance / $price;
-        
-        $response->getBody()->write(json_encode([
-            'account_id' => $accountId,
-            'provider' => 'Binance',
-            'conversion_type' => 'crypto',
-            'from_currency' => $from,
-            'to_crypto' => $to,
-            'market_symbol' => $marketSymbol,
-            'original_balance' => $balance,
-            'price' => $price,
-            'converted_amount' => round($convertedAmount, 8)
-        ]));
-        return $response->withHeader('Content-Type', 'application/json');
-    }
 
-    private function calculateBalance($accountId)
-    {
-        $stmt = $this->mysqli->prepare("
-            SELECT COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) -
-                   COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN amount ELSE 0 END), 0) AS balance
-            FROM transactions WHERE account_id = ?
-        ");
-        $stmt->bind_param('i', $accountId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        return (float)($row['balance'] ?? 0);
+        if (!$to) {
+            return $this->jsonResponse($response, ['error' => 'Missing target crypto'], 400);
+        }
+
+        $account = Account::find($accountId);
+        if (!$account) {
+            return $this->jsonResponse($response, ['error' => 'Account not found'], 404);
+        }
+
+        $balance = $this->transactionService->calculateBalance($account);
+
+        try {
+            $result = $this->exchangeService->convertCrypto($account, $balance, $to);
+            $result['account_id'] = $account->id;
+            return $this->jsonResponse($response, $result);
+        } catch (\RuntimeException $e) {
+            return $this->jsonResponse($response, ['error' => $e->getMessage()], 502);
+        } catch (\InvalidArgumentException $e) {
+            return $this->jsonResponse($response, ['error' => $e->getMessage()], 400);
+        }
     }
 
     public function createAccount($request, $response, $args)
     {
-        $data = json_decode((string)$request->getBody(), true);
+        $data = json_decode((string) $request->getBody(), true);
 
-        if(!isset($data["owner_name"]) || !isset($data["currency"])){
-            $response->getBody()->write(json_encode(['error' => 'Owner name and currency must be set']));
-            return $response->withHeader('Content-Type', 'application/json')->withStatus(400);
+        if (!isset($data["owner_name"]) || !isset($data["currency"])) {
+            return $this->jsonResponse($response, ['error' => 'Owner name and currency must be set'], 400);
         }
 
-        $owner_name = $data['owner_name'];
-        $currency = $data['currency'];
+        $account = Account::create([
+            'owner_name' => $data['owner_name'],
+            'currency' => $data['currency']
+        ]);
 
-        $stmt = $this->mysqli->prepare("    INSERT INTO accounts (owner_name,currency) VALUES (?,?)");
-
-        $stmt->bind_param("ss",$owner_name,$currency);
-        $stmt->execute();
-        $stmt->get_result();
-
-        $accountId = $this->mysqli->insert_id;
-
-        
-        $response->getBody()->write(json_encode([
-            'message' => 'Account successfully',
-            'accountId' => $accountId,
-            'owner_name' => $owner_name,
-            'currency' => $currency
-        ]));
-        return $response->withHeader('Content-Type', 'application/json');
-
+        return $this->jsonResponse($response, [
+            'message' => 'Account created successfully',
+            'accountId' => $account->id,
+            'owner_name' => $account->owner_name,
+            'currency' => $account->currency
+        ]);
     }
 }

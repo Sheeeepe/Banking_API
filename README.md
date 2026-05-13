@@ -12,7 +12,7 @@ The exercise required building a simplified REST banking backend in groups of 2�
 - balance conversion to fiat currency via [Frankfurter](https://frankfurter.dev)
 - balance conversion to cryptocurrency via [Binance](https://binance.com)
 
-Required technologies: **Slim**, **MySQL/MariaDB**, JSON responses.
+Required technologies: **Slim**, **MySQL/MariaDB**, JSON responses. *The project now also utilizes **Eloquent ORM** for database interactions and a Service-based architecture.*
 
 This implementation extends the base requirements with a Preact frontend and a fully containerized Docker setup.
 
@@ -30,14 +30,21 @@ This implementation extends the base requirements with a Preact frontend and a f
 
 ```shell
 Banking_API/
+├── Dockerfile                 # Railway deployment Dockerfile
 ├── api/
 │   ├── public/
 │   │   └── index.php          # Entry point
 │   └── src/
-│       ├── controllers/
+│       ├── Controllers/
 │       │   └── AccountController.php
+│       ├── Models/
+│       │   ├── Account.php
+│       │   └── Transaction.php
+│       ├── Services/
+│       │   ├── ExchangeService.php
+│       │   └── TransactionService.php
 │       ├── routes.php
-│       └── database.php
+│       └── Database.php
 ├── app/
 │   └── src/
 │       ├── api.js             # API calls
@@ -84,6 +91,17 @@ docker compose up --build
 | Frontend   | <http://localhost:5173> |
 | API        | <http://localhost:8080> |
 | phpMyAdmin | <http://localhost:8081> |
+
+## Deployment (Railway)
+
+This repository is pre-configured to be deployed directly on [Railway](https://railway.app).
+A `Dockerfile` is present at the root of the project which automatically detects and builds the Slim API, purposefully ignoring the local demo frontend in `/app`.
+
+To deploy:
+1. Create a new project on Railway.
+2. Link this GitHub repository.
+3. Ensure the project root is set to the default (`/`). Railway will detect the `Dockerfile`.
+4. Add the necessary environment variables (`DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) to connect to your production database.
 
 ## API Endpoints
 

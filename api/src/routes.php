@@ -2,7 +2,7 @@
 
 use App\Controllers\AccountController;
 
-return function ($app, $db_conn) {
+return function ($app) {
     $app->get('/', function ($request, $response) {
         $response->getBody()->write(json_encode([
             'message' => 'Mini Banking API',
@@ -11,7 +11,7 @@ return function ($app, $db_conn) {
         return $response->withHeader('Content-Type', 'application/json');
     });
 
-    $account = new AccountController($db_conn);
+    $account = new AccountController();
 
     $app->get('/accounts/{id}/transactions', [$account, 'getTransactions']);
     $app->get('/accounts/{id}/transactions/{transactionId}', [$account, 'getTransaction']);
