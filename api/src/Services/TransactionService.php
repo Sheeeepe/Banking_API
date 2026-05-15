@@ -8,12 +8,11 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 
 class TransactionService
 {
-    public function calculateBalance(Account $account): float
-    {
-        $deposits = $account->transactions()->where('type', 'deposit')->sum('amount');
-        $withdrawals = $account->transactions()->where('type', 'withdrawal')->sum('amount');
+    private BalanceService $balanceService;
 
-        return (float) ($deposits - $withdrawals);
+    public function __construct(BalanceService $balanceService)
+    {
+        $this->balanceService = $balanceService;
     }
 
     public function createDeposit(Account $account, float $amount, string $description = ''): Transaction
@@ -25,7 +24,7 @@ class TransactionService
         return Capsule::transaction(function () use ($account, $amount, $description) {
             $lockedAccount = Account::lockForUpdate()->find($account->id);
 
-            $currentBalance = $this->calculateBalance($lockedAccount);
+            $currentBalance = $this->balanceService->calculateBalance($lockedAccount);
             $newBalance = $currentBalance + $amount;
 
             return $lockedAccount->transactions()->create([
@@ -46,7 +45,7 @@ class TransactionService
         return Capsule::transaction(function () use ($account, $amount, $description) {
             $lockedAccount = Account::lockForUpdate()->find($account->id);
 
-            $currentBalance = $this->calculateBalance($lockedAccount);
+            $currentBalance = $this->balanceService->calculateBalance($lockedAccount);
 
             if ($amount > $currentBalance) {
                 throw new \InvalidArgumentException('Insufficient funds');
