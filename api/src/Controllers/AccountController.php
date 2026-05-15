@@ -271,4 +271,41 @@ class AccountController
             'currency' => $account->currency
         ]);
     }
+
+    public function createTransfer($request, $response, $args)
+    {
+        $fromAccountId = (int) $args['id'];
+        $data = $request->getParsedBody();
+
+        if (!isset($data['target_account_id'])) {
+            return $this->jsonResponse($response, ['error' => 'Target account ID is required'], 400);
+        }
+
+        $toAccountId = (int) $data['target_account_id'];
+        $amount = isset($data['amount']) ? (float) $data['amount'] : 0;
+        $description = $data['description'] ?? '';
+
+        $fromAccount = Account::find($fromAccountId);
+        if (!$fromAccount) {
+            return $this->jsonResponse($response, ['error' => 'Source account not found'], 404);
+        }
+
+        $toAccount = Account::find($toAccountId);
+        if (!$toAccount) {
+            return $this->jsonResponse($response, ['error' => 'Target account not found'], 404);
+        }
+
+        try {
+            $transfer = $this->transactionService->createTransfer($fromAccount, $toAccount, $amount, $description);
+        } catch (\InvalidArgumentException $e) {
+            $status = in_array($e->getMessage(), ['Insufficient funds']) ? 422 : 400;
+            return $this->jsonResponse($response, ['error' => $e->getMessage()], $status);
+        }
+
+        return $this->jsonResponse($response, [
+            'message' => 'Transfer successful',
+            'withdrawal' => $transfer['withdrawal'],
+            'deposit' => $transfer['deposit']
+        ], 201);
+    }
 }

@@ -17,6 +17,7 @@ return function ($app) {
     $app->get('/accounts/{id}/transactions/{transactionId}', [$account, 'getTransaction']);
     $app->post('/accounts/{id}/deposits', [$account, 'createDeposit']);
     $app->post('/accounts/{id}/withdrawals', [$account, 'createWithdrawal']);
+    $app->post('/accounts/{id}/transfers', [$account, 'createTransfer']);
     $app->put('/accounts/{id}/transactions/{transactionId}', [$account, 'updateTransaction']);
     $app->delete('/accounts/{id}/transactions/{transactionId}', [$account, 'deleteTransaction']);
     $app->get('/accounts/{id}/balance', [$account, 'getBalance']);
