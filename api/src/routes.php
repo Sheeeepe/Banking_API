@@ -23,5 +23,9 @@ return function ($app) {
     $app->get('/accounts/{id}/balance', [$account, 'getBalance']);
     $app->get('/accounts/{id}/balance/convert/fiat', [$account, 'convertFiat']);
     $app->get('/accounts/{id}/balance/convert/crypto', [$account, 'convertCrypto']);
+    $app->get('/accounts', [$account, 'getAccounts']);
     $app->post('/accounts', [$account, 'createAccount']);
+    $app->get('/accounts/{id}', [$account, 'getAccount']);
+    $app->put('/accounts/{id}', [$account, 'updateAccount']);
+    $app->delete('/accounts/{id}', [$account, 'deleteAccount']);
 };

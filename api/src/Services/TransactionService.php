@@ -12,8 +12,8 @@ class TransactionService
     {
         $deposits = $account->transactions()->where('type', 'deposit')->sum('amount');
         $withdrawals = $account->transactions()->where('type', 'withdrawal')->sum('amount');
-        
-        return (float)($deposits - $withdrawals);
+
+        return (float) ($deposits - $withdrawals);
     }
 
     public function createDeposit(Account $account, float $amount, string $description = ''): Transaction
@@ -24,7 +24,7 @@ class TransactionService
 
         return Capsule::transaction(function () use ($account, $amount, $description) {
             $lockedAccount = Account::lockForUpdate()->find($account->id);
-            
+
             $currentBalance = $this->calculateBalance($lockedAccount);
             $newBalance = $currentBalance + $amount;
 

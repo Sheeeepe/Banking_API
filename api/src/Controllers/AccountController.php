@@ -308,4 +308,67 @@ class AccountController
             'deposit' => $transfer['deposit']
         ], 201);
     }
+
+    public function getAccounts($request, $response, $args)
+    {
+        $accounts = Account::all();
+        return $this->jsonResponse($response, $accounts);
+    }
+
+    public function getAccount($request, $response, $args)
+    {
+        $accountId = (int) $args['id'];
+        $account = Account::find($accountId);
+
+        if (!$account) {
+            return $this->jsonResponse($response, ['error' => 'Account not found'], 404);
+        }
+
+        return $this->jsonResponse($response, $account);
+    }
+
+    public function updateAccount($request, $response, $args)
+    {
+        $accountId = (int) $args['id'];
+        $data = json_decode((string) $request->getBody(), true);
+
+        $account = Account::find($accountId);
+        if (!$account) {
+            return $this->jsonResponse($response, ['error' => 'Account not found'], 404);
+        }
+
+        if (isset($data['owner_name'])) {
+            $account->owner_name = $data['owner_name'];
+        }
+
+        $account->save();
+
+        return $this->jsonResponse($response, [
+            'message' => 'Account updated successfully',
+            'account' => $account
+        ]);
+    }
+
+    public function deleteAccount($request, $response, $args)
+    {
+        $accountId = (int) $args['id'];
+
+        $account = Account::find($accountId);
+        if (!$account) {
+            return $this->jsonResponse($response, ['error' => 'Account not found'], 404);
+        }
+
+        $balance = $this->transactionService->calculateBalance($account);
+        if ($balance != 0) {
+            return $this->jsonResponse($response, ['error' => 'Cannot delete account with non-zero balance'], 422);
+        }
+
+        $account->transactions()->delete();
+        $account->delete();
+
+        return $this->jsonResponse($response, [
+            'message' => 'Account deleted successfully',
+            'account_id' => $accountId
+        ]);
+    }
 }
