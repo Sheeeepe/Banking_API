@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Http\TransactionQueryParams;
 use App\Models\Transaction;
 use App\Services\TransactionService;
 
@@ -17,13 +18,39 @@ class TransactionController extends BaseController
     public function getTransactions($request, $response, $args)
     {
         $account = $request->getAttribute('account');
-        $transactions = $account->transactions()->orderBy('created_at', 'desc')->get();
+        $params  = TransactionQueryParams::fromRequest($request);
+
+        $paginated = $this->buildTransactionQuery($account, $params)
+            ->paginate($params->limit, ['*'], 'page', $params->page);
 
         return $this->jsonResponse($response, [
-            'account_id' => $account->id,
-            'currency' => $account->currency,
-            'transactions' => $transactions
+            'account_id'   => $account->id,
+            'currency'     => $account->currency,
+            'total'        => $paginated->total(),
+            'page'         => $paginated->currentPage(),
+            'limit'        => $params->limit,
+            'pages'        => $paginated->lastPage(),
+            'transactions' => $paginated->items(),
         ]);
+    }
+
+    private function buildTransactionQuery($account, TransactionQueryParams $params)
+    {
+        $query = $account->transactions();
+
+        if ($params->type !== null) {
+            $query->where('type', $params->type);
+        }
+
+        if ($params->from !== null) {
+            $query->where('created_at', '>=', $params->from . ' 00:00:00');
+        }
+
+        if ($params->to !== null) {
+            $query->where('created_at', '<=', $params->to . ' 23:59:59');
+        }
+
+        return $query->orderBy($params->sort, $params->order);
     }
 
     public function getTransaction($request, $response, $args)
