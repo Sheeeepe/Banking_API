@@ -20,6 +20,19 @@ class TransactionController extends BaseController
         $account = $request->getAttribute('account');
         $params  = TransactionQueryParams::fromRequest($request);
 
+        if ($params->limit === 0) {
+            $all = $this->buildTransactionQuery($account, $params)->get();
+            return $this->jsonResponse($response, [
+                'account_id'   => $account->id,
+                'currency'     => $account->currency,
+                'total'        => $all->count(),
+                'page'         => 1,
+                'limit'        => 0,
+                'pages'        => 1,
+                'transactions' => $all->values(),
+            ]);
+        }
+
         $paginated = $this->buildTransactionQuery($account, $params)
             ->paginate($params->limit, ['*'], 'page', $params->page);
 
