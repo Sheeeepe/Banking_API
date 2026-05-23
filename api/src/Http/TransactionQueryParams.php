@@ -41,8 +41,9 @@ class TransactionQueryParams
         $type  = in_array($p['type']  ?? null, self::ALLOWED_TYPES,  true) ? $p['type']  : null;
         $sort  = in_array($p['sort']  ?? null, self::ALLOWED_SORTS,  true) ? $p['sort']  : 'created_at';
         $order = in_array($p['order'] ?? null, self::ALLOWED_ORDERS, true) ? $p['order'] : 'desc';
-        $page  = max(1, (int) ($p['page']  ?? 1));
-        $limit = min(100, max(1, (int) ($p['limit'] ?? 20)));
+        $page     = max(1, (int) ($p['page'] ?? 1));
+        $limitRaw = (int) ($p['limit'] ?? 20);
+        $limit    = $limitRaw === 0 ? 0 : min(100, max(1, $limitRaw));
 
         $from = isset($p['from']) && self::isValidDate($p['from']) ? $p['from'] : null;
         $to   = isset($p['to'])   && self::isValidDate($p['to'])   ? $p['to']   : null;
