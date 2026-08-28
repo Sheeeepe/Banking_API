@@ -12,7 +12,7 @@ The exercise required building a simplified REST banking backend in groups of 2�
 - balance conversion to fiat currency via [Frankfurter](https://frankfurter.dev)
 - balance conversion to cryptocurrency via [Binance](https://binance.com)
 
-Required technologies: **Slim**, **MySQL/MariaDB**, JSON responses. *The project now also utilizes **Eloquent ORM** for database interactions and a Service-based architecture.*
+Required technologies: **Slim**, **MySQL/MariaDB**, JSON responses. _The project now also utilizes **Eloquent ORM** for database interactions and a Service-based architecture._
 
 This implementation extends the base requirements with a Preact frontend and a fully containerized Docker setup.
 
@@ -21,7 +21,7 @@ This implementation extends the base requirements with a Preact frontend and a f
 | Layer     | Technology             |
 | --------- | ---------------------- |
 | API       | PHP 8.3, Slim 4        |
-| Frontend  | Preact, Vite           |
+| Frontend  | Vue 3, Vite            |
 | Database  | MariaDB                |
 | DB Admin  | phpMyAdmin             |
 | Container | Docker, Docker Compose |
@@ -46,10 +46,7 @@ Banking_API/
 │       ├── routes.php
 │       └── Database.php
 ├── app/
-│   └── src/
-│       ├── api.js             # API calls
-│       ├── app.jsx            # Root component
-│       └── components/        # UI components
+│   └── ui-demo     # UI components
 ├── build/
 │   ├── Dockerfile.api
 │   ├── Dockerfile.frontend
@@ -98,6 +95,7 @@ This repository is pre-configured to be deployed directly on [Railway](https://r
 A `Dockerfile` is present at the root of the project which automatically detects and builds the Slim API, purposefully ignoring the local demo frontend in `/app`.
 
 To deploy:
+
 1. Create a new project on Railway.
 2. Link this GitHub repository.
 3. Ensure the project root is set to the default (`/`). Railway will detect the `Dockerfile`.
